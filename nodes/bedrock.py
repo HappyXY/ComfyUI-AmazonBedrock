@@ -52,7 +52,7 @@ class BedrockNovaMultimodal:
                         "default": 0.5,
                         "min": 0.0,
                         "max": 1.0,
-                        "step": 0.1,
+                        "step": 0.001,
                         "round": 0.001,  # The value represeting the precision to round to, will be set to the step value by default. Can be set to False to disable rounding.
                         "display": "slider",
                     },
@@ -63,7 +63,7 @@ class BedrockNovaMultimodal:
                         "default": 1.0,
                         "min": 0.0,
                         "max": 1.0,
-                        "step": 0.1,
+                        "step": 0.001,
                         "round": 0.001,  # The value represeting the precision to round to, will be set to the step value by default. Can be set to False to disable rounding.
                         "display": "slider",
                     },
@@ -174,6 +174,7 @@ class BedrockClaudeMultimodal:
                         "anthropic.claude-3-sonnet-20240229-v1:0",
                         "anthropic.claude-3-opus-20240229-v1:0",
                         "anthropic.claude-3-5-sonnet-20240620-v1:0",
+                        "anthropic.claude-3-5-sonnet-20241022-v2:0"
                         "anthropic.claude-3-7-sonnet-20250219-v1:0",
                     ],
                 ),
@@ -204,7 +205,7 @@ class BedrockClaudeMultimodal:
                         "default": 0.999,
                         "min": 0.0,
                         "max": 1.0,
-                        "step": 0.1,
+                        "step": 0.001,
                         "round": 0.001,  # The value represeting the precision to round to, will be set to the step value by default. Can be set to False to disable rounding.
                         "display": "slider",
                     },
