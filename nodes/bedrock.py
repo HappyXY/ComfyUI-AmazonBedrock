@@ -10,14 +10,14 @@ from retry import retry
 from PIL import Image
 import numpy as np
 import torch
+import boto3
 
-from .session import get_client
 
 MAX_RETRY = 3
 
 CLAUDE3_MAX_SIZE = 1568
 
-bedrock_runtime_client = get_client(service_name="bedrock-runtime")
+bedrock_runtime_client = boto3.client(service_name="bedrock-runtime")
 
 
 
@@ -25,6 +25,9 @@ class BedrockNovaMultimodal:
     @classmethod
     def INPUT_TYPES(s):
         return {
+            "optional": {
+                "system_prompt": ("STRING", {"multiline": True}),
+            },
             "required": {
                 "prompt": ("STRING", {"multiline": True}),
                 "model_id": (
@@ -87,6 +90,7 @@ class BedrockNovaMultimodal:
         temperature = kwargs.get('temperature')
         topP = kwargs.get('topP')
         image = kwargs.get('image')
+        system_prompt = kwargs.get('system_prompt')
         
         content = []
         content.append({
@@ -134,6 +138,17 @@ class BedrockNovaMultimodal:
             ensure_ascii=False,
         )
 
+        if system_prompt is not None:
+            body = json.dumps(
+                {
+                    "system": system_prompt,
+                    "messages": json.loads(body)["messages"],
+                    "schemaVersion": "messages-v1",
+                    "inferenceConfig": inf_params,
+                },
+                ensure_ascii=False,
+            )
+
         response = bedrock_runtime_client.invoke_model(
             body=body,
             modelId=model_id,
@@ -147,6 +162,9 @@ class BedrockClaudeMultimodal:
     @classmethod
     def INPUT_TYPES(s):
         return {
+            "optional": {
+                "system_prompt": ("STRING", {"multiline": True}),
+            },
             "required": {
                 "image": ("IMAGE",),
                 "prompt": ("STRING", {"multiline": True}),
@@ -156,6 +174,7 @@ class BedrockClaudeMultimodal:
                         "anthropic.claude-3-sonnet-20240229-v1:0",
                         "anthropic.claude-3-opus-20240229-v1:0",
                         "anthropic.claude-3-5-sonnet-20240620-v1:0",
+                        "anthropic.claude-3-7-sonnet-20250219-v1:0",
                     ],
                 ),
                 "max_tokens": (
@@ -171,10 +190,10 @@ class BedrockClaudeMultimodal:
                 "temperature": (
                     "FLOAT",
                     {
-                        "default": 0.5,
+                        "default": 1.0,
                         "min": 0.0,
                         "max": 1.0,
-                        "step": 0.1,
+                        "step": 0.001,
                         "round": 0.001,  # The value represeting the precision to round to, will be set to the step value by default. Can be set to False to disable rounding.
                         "display": "slider",
                     },
@@ -182,7 +201,7 @@ class BedrockClaudeMultimodal:
                 "top_p": (
                     "FLOAT",
                     {
-                        "default": 1.0,
+                        "default": 0.999,
                         "min": 0.0,
                         "max": 1.0,
                         "step": 0.1,
@@ -218,6 +237,7 @@ class BedrockClaudeMultimodal:
         temperature,
         top_p,
         top_k,
+        system_prompt=None,
     ):
         """
         Invokes the Anthropic Claude model to run an inference using the input
@@ -276,6 +296,19 @@ class BedrockClaudeMultimodal:
             },
             ensure_ascii=False,
         )
+        if system_prompt is not None:
+            body = json.dumps(
+                {
+                    "system": system_prompt,
+                    "messages": json.loads(body)["messages"],
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                },
+                ensure_ascii=False,
+            )
 
         response = bedrock_runtime_client.invoke_model(
             body=body,
@@ -290,10 +323,14 @@ class BedrockClaude:
     @classmethod
     def INPUT_TYPES(s):
         return {
+            "optional": {
+                "system_prompt": ("STRING", {"multiline": True}),
+            },
             "required": {
                 "prompt": ("STRING", {"multiline": True}),
                 "model_id": (
                     [
+                        "anthropic.claude-3-7-sonnet-20250219-v1:0",
                         "anthropic.claude-3-5-sonnet-20240620-v1:0",
                         "anthropic.claude-3-haiku-20240307-v1:0",
                         "anthropic.claude-3-sonnet-20240229-v1:0",
@@ -363,6 +400,7 @@ class BedrockClaude:
         temperature,
         top_p,
         top_k,
+        system_prompt=None,
     ):
         """
         Invokes the Anthropic Claude model to run an inference using the input
@@ -397,6 +435,20 @@ class BedrockClaude:
             },
             ensure_ascii=False,
         )
+
+        if system_prompt is not None:
+            body = json.dumps(
+                {
+                    "system": system_prompt,
+                    "messages": json.loads(body)["messages"],
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                },
+                ensure_ascii=False,
+            )
 
         response = bedrock_runtime_client.invoke_model(
             body=body,
