@@ -7,7 +7,6 @@ from datetime import datetime
 from retry import retry
 from PIL import Image
 import numpy as np
-from .session import get_client
 import time
 import boto3
 
@@ -16,14 +15,8 @@ def get_default_region():
     session = boto3.Session()
     return session.region_name
 
-def get_account_id():
-    sts_client = boto3.client('sts')
-    return sts_client.get_caller_identity().get('Account')
-
-s3_client = boto3.client("s3", region_name=get_default_region())
-bedrock_runtime_client = get_client(service_name="bedrock-runtime")
+bedrock_runtime_client = boto3.client("bedrock-runtime", region_name=get_default_region())
 region = get_default_region()
-account_id = get_account_id()
 
 def is_video_downloaded_for_invocation_job(invocation_job, output_folder="output"):
     """
@@ -131,9 +124,7 @@ class BedrockNovaVideo:
                         "display": "number",
                     },
                 ),
-                "destination_bucket": (
-                    [b["Name"] for b in s3_client.list_buckets()["Buckets"]],
-                ),
+                "destination_bucket": ("STRING", {"default": "novareel-output-bucket"}),
             },
             "optional": {
                 "image": ("IMAGE",),
