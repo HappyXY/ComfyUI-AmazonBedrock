@@ -17,9 +17,7 @@ MAX_RETRY = 3
 
 CLAUDE3_MAX_SIZE = 1568
 
-bedrock_runtime_client = boto3.client(service_name="bedrock-runtime")
-
-
+bedrock_runtime_client = boto3.client(service_name="bedrock-runtime", region_name="us-east-1")
 
 class BedrockNovaMultimodal:
     @classmethod

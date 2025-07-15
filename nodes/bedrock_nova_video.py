@@ -11,12 +11,8 @@ import time
 import boto3
 
 MAX_RETRY = 3
-def get_default_region():
-    session = boto3.Session()
-    return session.region_name
 
-bedrock_runtime_client = boto3.client("bedrock-runtime", region_name=get_default_region())
-region = get_default_region()
+bedrock_runtime_client = boto3.client("bedrock-runtime", region_name="us-east-1")
 
 def is_video_downloaded_for_invocation_job(invocation_job, output_folder="output"):
     """
