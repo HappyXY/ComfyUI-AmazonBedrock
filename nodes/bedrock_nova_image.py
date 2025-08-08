@@ -10,6 +10,8 @@ import torch
 import boto3
 import folder_paths
 import re
+import uuid
+
 
 MAX_RETRY = 2
 DEBUG_MODE = False
@@ -85,12 +87,6 @@ def generate_images(
 
     body_json = json.dumps(inference_params, indent=2)
 
-    # For debugging you might want to set DEBUG_MODE to True
-    if DEBUG_MODE:
-        request_file_path = os.path.join(output_directory, "request.json")
-        with open(request_file_path, "w") as f:
-            f.write(body_json)
-
     try:
         response = bedrock.invoke_model(
             body=body_json,
@@ -100,20 +96,6 @@ def generate_images(
         )
 
         response_body = json.loads(response.get("body").read())
-
-        if DEBUG_MODE:
-            response_metadata = response.get("ResponseMetadata")
-            # Write response metadata to JSON file.
-            response_metadata_file_path = os.path.join(
-                output_directory, "response_metadata.json"
-            )
-            with open(response_metadata_file_path, "w") as f:
-                json.dump(response_metadata, f, indent=2)
-
-            # Write response body to JSON file.
-            response_file_path = os.path.join(output_directory, "response_body.json")
-            with open(response_file_path, "w") as f:
-                json.dump(response_body, f, indent=2)
 
         # Log the request ID.
         print(f"Request ID: {response['ResponseMetadata']['RequestId']}")
@@ -608,9 +590,95 @@ class BedrockNovaBackgroundPromptReplace:
             images = torch.cat(images, 0)
         return (images,)
 
+class BedrockNovaRemoveObject:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "mask_image": ("IMAGE", ),
+                "num_images": (
+                    "INT",
+                    {
+                        "default": 1,
+                        "min": 1,
+                        "max": 5,
+                        "step": 1,
+                        "round": 1, 
+                        "display": "number",
+                    },
+                ),
+                "cfg_scale": (
+                    "FLOAT",
+                    {
+                        "default": 8.0,
+                        "min": 1.1,
+                        "max": 10.0,
+                        "step": 0.1,
+                        "round": 0.1, 
+                        "display": "slider",
+                    },
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "forward"
+    CATEGORY = "aws"
+
+    @retry(tries=MAX_RETRY)
+    def forward(self, image, mask_image, num_images, cfg_scale):
+        image = image[0] * 255.0
+        image = Image.fromarray(image.clamp(0, 255).numpy().round().astype(np.uint8))
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        image_data = buffer.getvalue()
+        image_base64 = base64.b64encode(image_data).decode("utf-8")
+
+        mask_image = mask_image[0] * 255.0
+        mask_image = Image.fromarray(mask_image.clamp(0, 255).numpy().round().astype(np.uint8))
+        buffer = BytesIO()
+        mask_image.save(buffer, format="PNG")
+        mask_image_data = buffer.getvalue()
+        mask_image_base64 = base64.b64encode(mask_image_data).decode("utf-8")
+
+        inference_params = {
+            "taskType": "INPAINTING",
+            "inPaintingParams": {
+                "image": image_base64,
+                "maskImage": mask_image_base64,
+                "negativeText": "blur",
+            },
+            "imageGenerationConfig": {
+                "numberOfImages": num_images,
+                "quality": "standard",
+                "cfgScale": cfg_scale,
+                "seed": uuid.uuid4().int % 858993459,
+            },
+        }
+
+        response_body = generate_images(
+            inference_params=inference_params, model_id="amazon.nova-canvas-v1:0"
+        )
+
+        images = [
+            np.array(Image.open(BytesIO(base64.b64decode(base64_image))))
+            for base64_image in response_body.get("images")
+        ]
+        images = [
+            torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
+            for image in images
+        ]
+        if len(images) == 1:
+            images = images[0]
+        else:
+            images = torch.cat(images, 0)
+        return (images,)
+
 
 NODE_CLASS_MAPPINGS = {
     "Amazon Bedrock - Nova Canvas Generate Image": BedrockNovaTextImage,
     "Amazon Bedrock - Nova Canvas Generate Variations": BedrockNovaIpAdatper,
     "Amazon Bedrock - Nova Canvas Background Prompt Replace": BedrockNovaBackgroundPromptReplace,
+    "Amazon Bedrock - Nova Canvas Remove Object": BedrockNovaRemoveObject,
 }
